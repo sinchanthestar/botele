@@ -11,7 +11,7 @@ import os # WAJIB DITAMBAHKAN UNTUK RAILWAY
 # KONFIGURASI UTAMA
 # ==========================================
 # 1. Telegram Token
-TOKEN = '8390879657:AAGvN0dI-P7r6hM2eIifNGSz-rwE6JJSUxw'
+TOKEN = '8435634970:AAF57eFmXyHuFru25lCsMETXQzBylPMbC88'
 bot = telebot.TeleBot(TOKEN)
 
 # 2. Veloura API Key
