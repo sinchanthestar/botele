@@ -131,7 +131,8 @@ def process_game_selection(call):
 
     # Cek apakah harga untuk game ini sudah diatur di script
     brand_prices = HARGA_PRODUK.get(brand, {})
-    game_prices = brand_prices.get(game_code)
+    # Mencari harga (case-insensitive agar lebih aman)
+    game_prices = brand_prices.get(game_code) or brand_prices.get(game_code.upper())
 
     if not game_prices:
         bot.edit_message_text(f"❌ Harga untuk game **{game_code}** belum diatur oleh Admin. Hubungi Admin.", 
@@ -139,14 +140,18 @@ def process_game_selection(call):
         return
 
     markup = InlineKeyboardMarkup(row_width=2)
+    buttons = []
     
     # Membuat tombol durasi secara otomatis berdasarkan data di HARGA_PRODUK
     for durasi, harga in game_prices.items():
         harga_k = harga // 1000 
         btn_text = f"{durasi} Hari ({harga_k}k)"
         callback_data = f"dur_{brand}_{game_code}_{durasi}"
-        markup.insert(InlineKeyboardButton(btn_text, callback_data=callback_data))
+        # Masukkan ke dalam daftar tombol
+        buttons.append(InlineKeyboardButton(btn_text, callback_data=callback_data))
     
+    # Tambahkan semua tombol sekaligus agar tersusun rapi (2 per baris)
+    markup.add(*buttons)
     markup.add(InlineKeyboardButton("🔙 Batal", callback_data="cancel_order"))
     
     bot.edit_message_text(f"Game: **{game_code}** ({brand.title()}).\nSilakan pilih durasi paket:", 
