@@ -58,8 +58,8 @@ def send_welcome(message):
 def send_brand_menu(message):
     markup = InlineKeyboardMarkup(row_width=1)
     markup.add(
-        InlineKeyboardButton("🎮 Veloura", callback_data="brand_veloura"),
-        InlineKeyboardButton("🏹 Arrowmodz", callback_data="brand_arrowmodz")
+        InlineKeyboardButton("🎮 VELOURA", callback_data="brand_veloura"),
+        InlineKeyboardButton("🏹 ARROW", callback_data="brand_arrowmodz")
     )
     bot.reply_to(message, "Silakan pilih Produk/Brand yang ingin Anda order:", reply_markup=markup)
 
