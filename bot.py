@@ -24,7 +24,7 @@ HARGA_VELOURA = {1: 15000, 3: 25000, 7: 50000, 30: 100000, 60: 200000, 90: 25000
 
 # Konfigurasi Brand 2: Arrowmodz (SILAKAN SESUAIKAN)
 API_KEY_ARROWMODZ = '0ZEiUu-8MOhL6-lhoQBV-IvpAoh'
-URL_API_ARROWMODZ = 'https://arrowmodz.biz.id/api/order/register' # Ganti dengan URL API Arrowmodz yang asli
+URL_API_ARROWMODZ = 'https://arrowmodz.site/api/order/register' # Ganti dengan URL API Arrowmodz yang asli
 HARGA_ARROWMODZ = {1: 15000, 3: 25000, 7: 50000, 30: 100000, 60: 200000, 90: 250000} # Sesuaikan harga Arrowmodz
 
 app = Flask(__name__)
