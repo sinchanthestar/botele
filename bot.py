@@ -17,17 +17,31 @@ MIDTRANS_SERVER_KEY = 'Mid-server-Aa6IQjd6Gx4YTuuG9-aDbz25'
 MIDTRANS_URL = 'https://app.sandbox.midtrans.com/snap/v1/transactions'
 WEBHOOK_URL_BASE = 'https://botele-production.up.railway.app' 
 
-# Konfigurasi Brand 1: Veloura
+# Konfigurasi API
 API_KEY_VELOURA = 'IMyIc3-D1TEqA-GpAoZb-CtKWc2'
 URL_API_VELOURA_ORDER = 'https://velouramlbb.biz.id/api/order/register'
-URL_API_VELOURA_GAMES = 'https://velouramlbb.biz.id/api/get/games' # Endpoint baru untuk ambil game
-HARGA_VELOURA = {1: 15000, 3: 25000, 7: 50000, 30: 100000, 60: 200000, 90: 250000}
+URL_API_VELOURA_GAMES = 'https://velouramlbb.biz.id/api/get/games'
 
-# Konfigurasi Brand 2: Arrowmodz
 API_KEY_ARROWMODZ = '0ZEiUu-8MOhL6-lhoQBV-IvpAoh'
 URL_API_ARROWMODZ_ORDER = 'https://arrowmodz.site/api/order/register' 
-URL_API_ARROWMODZ_GAMES = 'https://arrowmodz.site/api/get/games' # Endpoint baru untuk ambil game
-HARGA_ARROWMODZ = {1: 15000, 3: 25000, 7: 50000, 30: 100000, 60: 200000, 90: 250000} 
+URL_API_ARROWMODZ_GAMES = 'https://arrowmodz.site/api/get/games'
+
+# ==========================================
+# KONFIGURASI HARGA DINAMIS (REVISI BARU)
+# ==========================================
+# Format: "brand": { "KODE_GAME": { durasi: harga, durasi: harga } }
+HARGA_PRODUK = {
+    "veloura": {
+        "MLBB": {1: 15000, 3: 25000, 7: 50000, 30: 100000, 60: 200000, 90: 250000},
+        # Contoh jika ada game lain:
+        # "PUBGM": {1: 20000, 7: 75000, 30: 150000} 
+    },
+    "arrowmodz": {
+        "MLBB": {1: 15000, 3: 25000, 7: 50000, 30: 100000, 60: 200000, 90: 250000},
+        # Contoh jika ada game lain di Arrowmodz:
+        # "CODM": {1: 18000, 7: 60000, 30: 120000}
+    }
+}
 
 app = Flask(__name__)
 pending_orders = {}
@@ -53,13 +67,11 @@ def send_brand_menu(message):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('brand_'))
 def process_brand_selection(call):
     bot.answer_callback_query(call.id)
-    brand = call.data.split('_')[1] # Ambil nama brand dari callback_data
+    brand = call.data.split('_')[1]
 
-    # Pesan loading sementara menghubungi API server
     bot.edit_message_text(f"⏳ Sedang mengambil daftar game dari server **{brand.title()}**...", 
                           chat_id=call.message.chat.id, message_id=call.message.message_id, parse_mode='Markdown')
 
-    # Menentukan endpoint berdasarkan brand
     if brand == "veloura":
         url_games = URL_API_VELOURA_GAMES
         api_key = API_KEY_VELOURA
@@ -68,7 +80,6 @@ def process_brand_selection(call):
         api_key = API_KEY_ARROWMODZ
 
     try:
-        # Menembak API untuk mendapatkan list game
         response = requests.post(url_games, data={'api_key': api_key})
         data = response.json()
 
@@ -76,7 +87,6 @@ def process_brand_selection(call):
             markup = InlineKeyboardMarkup(row_width=1)
             games = data.get("data", [])
             
-            # Melakukan perulangan untuk membuat tombol setiap game
             for game in games:
                 game_name = game.get("game")
                 game_code = game.get("code")
@@ -84,44 +94,51 @@ def process_brand_selection(call):
                 
                 btn_text = f"🕹️ {game_name}"
                 if game_status.lower() != "safe":
-                    btn_text += f" ({game_status})" # Tambah info jika maintenance/update
+                    btn_text += f" ({game_status})"
                 
-                # Simpan brand dan game_code di callback data (contoh: game_veloura_MLBB)
                 markup.add(InlineKeyboardButton(btn_text, callback_data=f"game_{brand}_{game_code}"))
 
             markup.add(InlineKeyboardButton("🔙 Batal", callback_data="cancel_order"))
-            
             bot.edit_message_text(f"Anda memilih **{brand.title()}**.\nSilakan pilih Game:", 
                                   chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=markup, parse_mode='Markdown')
         else:
             bot.edit_message_text(f"❌ Gagal mengambil daftar game dari {brand.title()}:\n{data.get('message')}", 
                                   chat_id=call.message.chat.id, message_id=call.message.message_id)
-
     except Exception as e:
         bot.edit_message_text(f"❌ Terjadi kesalahan saat menghubungi server {brand.title()}.", 
                               chat_id=call.message.chat.id, message_id=call.message.message_id)
 
-# TAHAP 3: MENU DURASI (Setelah Game Dipilih)
+# TAHAP 3: MENU DURASI & HARGA (Dibuat Dinamis)
 @bot.callback_query_handler(func=lambda call: call.data.startswith('game_'))
 def process_game_selection(call):
     bot.answer_callback_query(call.id)
     
-    # Memecah callback (contoh: "game_veloura_MLBB" -> brand="veloura", game_code="MLBB")
     parts = call.data.split('_')
     brand = parts[1]
     game_code = parts[2]
 
+    # Cek apakah harga untuk game ini sudah diatur di script
+    brand_prices = HARGA_PRODUK.get(brand, {})
+    game_prices = brand_prices.get(game_code)
+
+    if not game_prices:
+        bot.edit_message_text(f"❌ Harga untuk game **{game_code}** belum diatur oleh Admin. Hubungi Admin.", 
+                              chat_id=call.message.chat.id, message_id=call.message.message_id, parse_mode='Markdown')
+        return
+
     markup = InlineKeyboardMarkup(row_width=2)
-    # Callback data sekarang membawa durasi (contoh: dur_veloura_MLBB_1)
-    markup.add(
-        InlineKeyboardButton("1 Hari (15k)", callback_data=f"dur_{brand}_{game_code}_1"),
-        InlineKeyboardButton("3 Hari (25k)", callback_data=f"dur_{brand}_{game_code}_3"),
-        InlineKeyboardButton("7 Hari (50k)", callback_data=f"dur_{brand}_{game_code}_7"),
-        InlineKeyboardButton("30 Hari (100k)", callback_data=f"dur_{brand}_{game_code}_30"),
-        InlineKeyboardButton("60 Hari (200k)", callback_data=f"dur_{brand}_{game_code}_60"),
-        InlineKeyboardButton("90 Hari (250k)", callback_data=f"dur_{brand}_{game_code}_90"),
-        InlineKeyboardButton("🔙 Batal", callback_data="cancel_order")
-    )
+    
+    # Membuat tombol durasi secara otomatis berdasarkan data di HARGA_PRODUK
+    for durasi, harga in game_prices.items():
+        harga_k = harga // 1000 # Mengubah 15000 menjadi 15 untuk tampilan (15k)
+        btn_text = f"{durasi} Hari ({harga_k}k)"
+        callback_data = f"dur_{brand}_{game_code}_{durasi}"
+        
+        # Tambahkan tombol ke dalam layout (otomatis berjejer 2 per baris karena row_width=2)
+        markup.insert(InlineKeyboardButton(btn_text, callback_data=callback_data))
+    
+    markup.add(InlineKeyboardButton("🔙 Batal", callback_data="cancel_order"))
+    
     bot.edit_message_text(f"Game: **{game_code}** ({brand.title()}).\nSilakan pilih durasi paket:", 
                           chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=markup, parse_mode='Markdown')
 
@@ -133,16 +150,17 @@ def cancel_order(call):
 # TAHAP 4: PROSES LINK PEMBAYARAN MIDTRANS
 @bot.callback_query_handler(func=lambda call: call.data.startswith('dur_'))
 def process_payment_link(call):
-    # Memecah callback (contoh: "dur_veloura_MLBB_7")
     parts = call.data.split('_')
     brand = parts[1]
     game_code = parts[2]
     durasi = int(parts[3])
     
-    if brand == "veloura":
-        harga = HARGA_VELOURA.get(durasi, 0)
-    else:
-        harga = HARGA_ARROWMODZ.get(durasi, 0)
+    # Mengambil harga aktual dari database memori kita
+    try:
+        harga = HARGA_PRODUK[brand][game_code][durasi]
+    except KeyError:
+        bot.edit_message_text("❌ Terjadi kesalahan: Data harga tidak valid.", chat_id=call.message.chat.id, message_id=call.message.message_id)
+        return
         
     chat_id = call.message.chat.id
     nama_user = call.from_user.first_name
@@ -152,7 +170,6 @@ def process_payment_link(call):
 
     order_id = f"{brand[:2].upper()}-{chat_id}-{int(time.time())}" 
     
-    # Simpan semua detail ke memori (brand, game_code, durasi)
     pending_orders[order_id] = {
         "chat_id": chat_id, "nama_user": nama_user, "durasi": durasi, 
         "brand": brand, "game_code": game_code
@@ -211,7 +228,6 @@ def midtrans_webhook():
 
             bot.send_message(chat_id, f"✅ Pembayaran diterima! Sedang meng-generate License {brand.title()} untuk game {game_code}...")
 
-            # Menyiapkan request ke API pembuat License
             if brand == "veloura":
                 url_api_order = URL_API_VELOURA_ORDER
                 api_key_order = API_KEY_VELOURA
@@ -219,7 +235,6 @@ def midtrans_webhook():
                 url_api_order = URL_API_ARROWMODZ_ORDER
                 api_key_order = API_KEY_ARROWMODZ
 
-            # Parameter game mengambil langsung dari pilihan user (game_code)
             payload_api = {"api_key": api_key_order, "nama": nama_user, "durasi": durasi, "game": game_code, "max_devices": 1} 
 
             try:
