@@ -13,7 +13,7 @@ TOKEN = '8435634970:AAF57eFmXyHuFru25lCsMETXQzBylPMbC88' # Masukkan Token (Jika 
 bot = telebot.TeleBot(TOKEN)
 
 API_KEY_VELOURA = 'IMyIc3-D1TEqA-GpAoZb-CtKWc2'
-MIDTRANS_SERVER_KEY = 'SB-Mid-server-Aa6IQjd6Gx4YTuuG9-aDbz25' # Masukkan Server Key Sandbox Midtrans
+MIDTRANS_SERVER_KEY = 'Mid-server-Aa6IQjd6Gx4YTuuG9-aDbz25' # Masukkan Server Key Sandbox Midtrans
 MIDTRANS_URL = 'https://app.sandbox.midtrans.com/snap/v1/transactions'
 
 # WAJIB DIISI! Masukkan URL publik Railway Anda (Tanpa garis miring di akhir)
