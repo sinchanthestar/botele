@@ -9,7 +9,7 @@ import os
 # ==========================================
 # 1. KONFIGURASI UTAMA
 # ==========================================
-TOKEN = 'TOKEN_BOT_TELEGRAM_ANDA' # Masukkan Token (Jika tadi direset, masukkan yang baru)
+TOKEN = '8435634970:AAF57eFmXyHuFru25lCsMETXQzBylPMbC88' # Masukkan Token (Jika tadi direset, masukkan yang baru)
 bot = telebot.TeleBot(TOKEN)
 
 API_KEY_VELOURA = 'IMyIc3-D1TEqA-GpAoZb-CtKWc2'
