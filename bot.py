@@ -17,29 +17,36 @@ MIDTRANS_SERVER_KEY = 'Mid-server-Aa6IQjd6Gx4YTuuG9-aDbz25'
 MIDTRANS_URL = 'https://app.sandbox.midtrans.com/snap/v1/transactions'
 WEBHOOK_URL_BASE = 'https://botele-production.up.railway.app' 
 
-# Konfigurasi API
+# Konfigurasi Brand 1: Veloura
 API_KEY_VELOURA = 'IMyIc3-D1TEqA-GpAoZb-CtKWc2'
 URL_API_VELOURA_ORDER = 'https://velouramlbb.biz.id/api/order/register'
 URL_API_VELOURA_GAMES = 'https://velouramlbb.biz.id/api/get/games'
 
+# Konfigurasi Brand 2: Arrowmodz
 API_KEY_ARROWMODZ = '0ZEiUu-8MOhL6-lhoQBV-IvpAoh'
 URL_API_ARROWMODZ_ORDER = 'https://arrowmodz.site/api/order/register' 
 URL_API_ARROWMODZ_GAMES = 'https://arrowmodz.site/api/get/games'
 
+# Konfigurasi Brand 3: Attic Premium
+API_KEY_ATTIC = 'd8y0lfw81hof5e0kwevwia8ldamsfhu9' # Ganti dengan API Key Attic Premium Anda
+URL_API_ATTIC_ORDER = 'https://atticprem.shop/api/order/register'
+URL_API_ATTIC_GAMES = 'https://atticprem.shop/api/get/games'
+
 # ==========================================
-# KONFIGURASI HARGA DINAMIS (REVISI BARU)
+# KONFIGURASI HARGA DINAMIS
 # ==========================================
 # Format: "brand": { "KODE_GAME": { durasi: harga, durasi: harga } }
 HARGA_PRODUK = {
     "veloura": {
         "MLBB": {1: 15000, 3: 25000, 7: 50000, 30: 100000, 60: 200000, 90: 250000},
-        # Contoh jika ada game lain:
-        # "PUBGM": {1: 20000, 7: 75000, 30: 150000} 
     },
     "arrowmodz": {
         "MLBB": {1: 15000, 3: 25000, 7: 50000, 30: 100000, 60: 200000, 90: 250000},
-        # Contoh jika ada game lain di Arrowmodz:
-        # "CODM": {1: 18000, 7: 60000, 30: 120000}
+    },
+    "attic": {
+        # Asumsi Attic Premium juga menjual MLBB. Sesuaikan harga dan kode game jika berbeda.
+        "MLBB": {1: 15000, 3: 25000, 7: 50000, 30: 100000, 60: 200000, 90: 250000},
+        # "PUBGM": {1: 20000, 7: 75000, 30: 150000} # Contoh jika ada game lain
     }
 }
 
@@ -58,8 +65,9 @@ def send_welcome(message):
 def send_brand_menu(message):
     markup = InlineKeyboardMarkup(row_width=1)
     markup.add(
-        InlineKeyboardButton("🎮 VELOURA", callback_data="brand_veloura"),
-        InlineKeyboardButton("🏹 ARROW", callback_data="brand_arrowmodz")
+        InlineKeyboardButton("🎮 Veloura", callback_data="brand_veloura"),
+        InlineKeyboardButton("🏹 Arrowmodz", callback_data="brand_arrowmodz"),
+        InlineKeyboardButton("💎 Attic Premium", callback_data="brand_attic") # Tombol Brand Baru
     )
     bot.reply_to(message, "Silakan pilih Produk/Brand yang ingin Anda order:", reply_markup=markup)
 
@@ -72,12 +80,16 @@ def process_brand_selection(call):
     bot.edit_message_text(f"⏳ Sedang mengambil daftar game dari server **{brand.title()}**...", 
                           chat_id=call.message.chat.id, message_id=call.message.message_id, parse_mode='Markdown')
 
+    # Pemilihan endpoint API berdasarkan brand
     if brand == "veloura":
         url_games = URL_API_VELOURA_GAMES
         api_key = API_KEY_VELOURA
-    else:
+    elif brand == "arrowmodz":
         url_games = URL_API_ARROWMODZ_GAMES
         api_key = API_KEY_ARROWMODZ
+    elif brand == "attic":
+        url_games = URL_API_ATTIC_GAMES
+        api_key = API_KEY_ATTIC
 
     try:
         response = requests.post(url_games, data={'api_key': api_key})
@@ -130,11 +142,9 @@ def process_game_selection(call):
     
     # Membuat tombol durasi secara otomatis berdasarkan data di HARGA_PRODUK
     for durasi, harga in game_prices.items():
-        harga_k = harga // 1000 # Mengubah 15000 menjadi 15 untuk tampilan (15k)
+        harga_k = harga // 1000 
         btn_text = f"{durasi} Hari ({harga_k}k)"
         callback_data = f"dur_{brand}_{game_code}_{durasi}"
-        
-        # Tambahkan tombol ke dalam layout (otomatis berjejer 2 per baris karena row_width=2)
         markup.insert(InlineKeyboardButton(btn_text, callback_data=callback_data))
     
     markup.add(InlineKeyboardButton("🔙 Batal", callback_data="cancel_order"))
@@ -155,7 +165,6 @@ def process_payment_link(call):
     game_code = parts[2]
     durasi = int(parts[3])
     
-    # Mengambil harga aktual dari database memori kita
     try:
         harga = HARGA_PRODUK[brand][game_code][durasi]
     except KeyError:
@@ -228,12 +237,16 @@ def midtrans_webhook():
 
             bot.send_message(chat_id, f"✅ Pembayaran diterima! Sedang meng-generate License {brand.title()} untuk game {game_code}...")
 
+            # Pemilihan URL Order berdasarkan brand
             if brand == "veloura":
                 url_api_order = URL_API_VELOURA_ORDER
                 api_key_order = API_KEY_VELOURA
             elif brand == "arrowmodz":
                 url_api_order = URL_API_ARROWMODZ_ORDER
                 api_key_order = API_KEY_ARROWMODZ
+            elif brand == "attic":
+                url_api_order = URL_API_ATTIC_ORDER
+                api_key_order = API_KEY_ATTIC
 
             payload_api = {"api_key": api_key_order, "nama": nama_user, "durasi": durasi, "game": game_code, "max_devices": 1} 
 
@@ -256,7 +269,7 @@ def midtrans_webhook():
 
 @app.route('/')
 def index():
-    return "Server Webhook Multi-Brand & Dynamic Games Berjalan Lancar! 🚀", 200
+    return "Server Webhook Multi-Brand Berjalan Lancar! 🚀", 200
 
 # ==========================================
 # 4. MENJALANKAN SERVER
