@@ -1,36 +1,32 @@
 import telebot
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, Update
 import requests
 import json
 import time
 from flask import Flask, request, jsonify
-import threading
-import os # WAJIB DITAMBAHKAN UNTUK RAILWAY
+import os
 
 # ==========================================
-# KONFIGURASI UTAMA
+# 1. KONFIGURASI UTAMA
 # ==========================================
-# 1. Telegram Token
-TOKEN = '8435634970:AAF57eFmXyHuFru25lCsMETXQzBylPMbC88'
+TOKEN = 'TOKEN_BOT_TELEGRAM_ANDA' # Masukkan Token (Jika tadi direset, masukkan yang baru)
 bot = telebot.TeleBot(TOKEN)
 
-# 2. Veloura API Key
 API_KEY_VELOURA = 'IMyIc3-D1TEqA-GpAoZb-CtKWc2'
-
-# 3. Midtrans Konfigurasi (GANTI DENGAN SERVER KEY SANDBOX ANDA)
-MIDTRANS_SERVER_KEY = 'Mid-server-Aa6IQjd6Gx4YTuuG9-aDbz25' 
+MIDTRANS_SERVER_KEY = 'SB-Mid-server-Aa6IQjd6Gx4YTuuG9-aDbz25' # Masukkan Server Key Sandbox Midtrans
 MIDTRANS_URL = 'https://app.sandbox.midtrans.com/snap/v1/transactions'
+
+# WAJIB DIISI! Masukkan URL publik Railway Anda (Tanpa garis miring di akhir)
+# Contoh: 'https://bot-veloura-production.up.railway.app'
+WEBHOOK_URL_BASE = 'https://botele-production.up.railway.app' 
 
 app = Flask(__name__)
 pending_orders = {}
 
-HARGA_VELOURA = {
-    1: 15000, 3: 25000, 7: 50000, 
-    30: 100000, 60: 200000, 90: 250000
-}
+HARGA_VELOURA = {1: 15000, 3: 25000, 7: 50000, 30: 100000, 60: 200000, 90: 250000}
 
 # ==========================================
-# BAGIAN 1: LOGIKA BOT TELEGRAM
+# 2. LOGIKA BOT TELEGRAM
 # ==========================================
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -39,29 +35,24 @@ def send_welcome(message):
 @bot.message_handler(commands=['order'])
 def send_brand_menu(message):
     markup = InlineKeyboardMarkup(row_width=1)
-    btn_veloura = InlineKeyboardButton("🎮 Veloura MLBB", callback_data="brand_veloura")
-    markup.add(btn_veloura)
+    markup.add(InlineKeyboardButton("🎮 Veloura MLBB", callback_data="brand_veloura"))
     bot.reply_to(message, "Silakan pilih Produk/Brand yang ingin Anda order:", reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: call.data == 'brand_veloura')
 def process_brand_selection(call):
     bot.answer_callback_query(call.id)
     markup = InlineKeyboardMarkup(row_width=2)
-    
-    btn1 = InlineKeyboardButton("1 Hari (15k)", callback_data="veloura_1")
-    btn3 = InlineKeyboardButton("3 Hari (25k)", callback_data="veloura_3")
-    btn7 = InlineKeyboardButton("7 Hari (50k)", callback_data="veloura_7")
-    btn30 = InlineKeyboardButton("30 Hari (100k)", callback_data="veloura_30")
-    btn60 = InlineKeyboardButton("60 Hari (200k)", callback_data="veloura_60")
-    btn90 = InlineKeyboardButton("90 Hari (250k)", callback_data="veloura_90")
-    btn_back = InlineKeyboardButton("🔙 Batal", callback_data="cancel_order")
-    
-    markup.add(btn1, btn3, btn7, btn30, btn60, btn90, btn_back)
-    
-    bot.edit_message_text(
-        "Anda memilih **Veloura MLBB**.\nSilakan pilih durasi paket:", 
-        chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=markup, parse_mode='Markdown'
+    markup.add(
+        InlineKeyboardButton("1 Hari (15k)", callback_data="veloura_1"),
+        InlineKeyboardButton("3 Hari (25k)", callback_data="veloura_3"),
+        InlineKeyboardButton("7 Hari (50k)", callback_data="veloura_7"),
+        InlineKeyboardButton("30 Hari (100k)", callback_data="veloura_30"),
+        InlineKeyboardButton("60 Hari (200k)", callback_data="veloura_60"),
+        InlineKeyboardButton("90 Hari (250k)", callback_data="veloura_90"),
+        InlineKeyboardButton("🔙 Batal", callback_data="cancel_order")
     )
+    bot.edit_message_text("Anda memilih **Veloura MLBB**.\nSilakan pilih durasi paket:", 
+                          chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=markup, parse_mode='Markdown')
 
 @bot.callback_query_handler(func=lambda call: call.data == 'cancel_order')
 def cancel_order(call):
@@ -79,7 +70,6 @@ def process_payment_link(call):
     bot.edit_message_text("⏳ Sedang membuat link pembayaran aman via Midtrans...", chat_id=chat_id, message_id=call.message.message_id)
 
     order_id = f"VL-{chat_id}-{int(time.time())}"
-
     pending_orders[order_id] = {"chat_id": chat_id, "nama_user": nama_user, "durasi": durasi}
 
     payload_midtrans = {
@@ -95,31 +85,33 @@ def process_payment_link(call):
         if response.status_code == 201:
             payment_url = data_midtrans['redirect_url']
             markup = InlineKeyboardMarkup()
-            btn_pay = InlineKeyboardButton("💳 Bayar Sekarang", url=payment_url)
-            markup.add(btn_pay)
-            
+            markup.add(InlineKeyboardButton("💳 Bayar Sekarang", url=payment_url))
             bot.edit_message_text(
-                f"📝 **INVOICE ORDER**\n\n"
-                f"📦 Produk: Veloura MLBB ({durasi} Hari)\n"
-                f"💰 Total: Rp {harga:,}\n\n"
-                f"Klik tombol di bawah untuk membayar. "
-                f"License akan otomatis dikirim ke sini setelah sukses.",
+                f"📝 **INVOICE ORDER**\n\n📦 Produk: Veloura MLBB ({durasi} Hari)\n💰 Total: Rp {harga:,}\n\nKlik tombol di bawah untuk membayar. License akan otomatis dikirim ke sini.",
                 chat_id=chat_id, message_id=call.message.message_id, reply_markup=markup, parse_mode='Markdown'
             )
         else:
-            bot.edit_message_text(f"❌ Gagal membuat pembayaran: {data_midtrans.get('error_messages', ['Error'])[0]}", chat_id=chat_id, message_id=call.message.message_id)
+            bot.edit_message_text("❌ Gagal membuat link pembayaran.", chat_id=chat_id, message_id=call.message.message_id)
     except Exception as e:
-        bot.edit_message_text(f"❌ Terjadi kesalahan sistem pembayaran.", chat_id=chat_id, message_id=call.message.message_id)
-
+        bot.edit_message_text("❌ Terjadi kesalahan sistem pembayaran.", chat_id=chat_id, message_id=call.message.message_id)
 
 # ==========================================
-# BAGIAN 2: WEB SERVER FLASK (UNTUK WEBHOOK)
+# 3. FLASK ROUTES (WEBHOOKS)
 # ==========================================
+# A. Route untuk Menerima Pesan dari Telegram
+@app.route(f'/{TOKEN}', methods=['POST'])
+def telegram_webhook():
+    if request.headers.get('content-type') == 'application/json':
+        json_string = request.get_data().decode('utf-8')
+        update = Update.de_json(json_string)
+        bot.process_new_updates([update])
+        return '', 200
+    return 'Forbidden', 403
+
+# B. Route untuk Menerima Notifikasi dari Midtrans
 @app.route('/webhook/midtrans', methods=['POST'])
 def midtrans_webhook():
     data = request.json
-    print(f"\n[WEBHOOK MASUK] Notifikasi: {data.get('transaction_status')} Order: {data.get('order_id')}")
-
     order_id = data.get('order_id')
     transaction_status = data.get('transaction_status')
     fraud_status = data.get('fraud_status')
@@ -134,50 +126,39 @@ def midtrans_webhook():
             bot.send_message(chat_id, "✅ Pembayaran diterima! Sedang meng-generate License Veloura Anda...")
 
             url_veloura = "https://velouramlbb.biz.id/api/order/register"
-            payload_veloura = {
-                "api_key": API_KEY_VELOURA, "nama": nama_user, "durasi": durasi, "game": "MLBB", "max_devices": 1
-            }
+            payload_veloura = {"api_key": API_KEY_VELOURA, "nama": nama_user, "durasi": durasi, "game": "MLBB", "max_devices": 1}
 
             try:
                 res_veloura = requests.post(url_veloura, data=payload_veloura)
                 data_veloura = res_veloura.json()
 
                 if data_veloura.get("status") == True:
-                    data_api = data_veloura.get("data", {})
-                    license_key = data_api.get("License") or data_api.get("license") or "[KEY TIDAK DITEMUKAN]"
-                    
-                    balasan = (
-                        f"🎉 **TERIMA KASIH! ORDER SELESAI**\n\n"
-                        f"👤 Nama: {nama_user}\n"
-                        f"📦 Paket: {durasi} Hari\n"
-                        f"🔑 License: `{license_key}`\n\n"
-                        f"*(Ketuk license di atas untuk menyalin)*"
-                    )
+                    license_key = data_veloura.get("data", {}).get("License") or data_veloura.get("data", {}).get("license") or "[KEY TIDAK DITEMUKAN]"
+                    balasan = f"🎉 **TERIMA KASIH! ORDER SELESAI**\n\n👤 Nama: {nama_user}\n📦 Paket: {durasi} Hari\n🔑 License: `{license_key}`\n\n*(Ketuk license di atas untuk menyalin)*"
                     bot.send_message(chat_id, balasan, parse_mode='Markdown')
                 else:
-                    error_msg = data_veloura.get("message", "Error sistem Veloura.")
-                    bot.send_message(chat_id, f"⚠️ Pembayaran masuk, tapi gagal generate key:\n{error_msg}\nHubungi Admin.")
-
+                    bot.send_message(chat_id, f"⚠️ Pembayaran masuk, tapi gagal generate key:\n{data_veloura.get('message', 'Error')}\nHubungi Admin.")
             except Exception as e:
-                bot.send_message(chat_id, f"⚠️ Pembayaran berhasil, tapi terjadi error saat menghubungi server Veloura.")
+                bot.send_message(chat_id, "⚠️ Pembayaran berhasil, tapi terjadi error server Veloura.")
             
             del pending_orders[order_id]
 
     return jsonify({"status": "ok"}), 200
 
-# ==========================================
-# BAGIAN 3: MENJALANKAN (PENYESUAIAN RAILWAY)
-# ==========================================
-def run_bot():
-    print("🤖 Bot Telegram sedang berjalan...")
-    bot.infinity_polling()
+# C. Route Utama untuk Pengecekan
+@app.route('/')
+def index():
+    return "Server Webhook Bot Telegram & Midtrans Berjalan Lancar! 🚀", 200
 
+# ==========================================
+# 4. MENJALANKAN SERVER
+# ==========================================
 if __name__ == '__main__':
-    threading.Thread(target=run_bot).start()
+    # Hapus Webhook lama dan pasang Webhook baru ke URL Railway
+    bot.remove_webhook()
+    time.sleep(1)
+    bot.set_webhook(url=f"{WEBHOOK_URL_BASE}/{TOKEN}")
+    print("✅ Webhook Telegram Berhasil Dipasang!")
     
-    # RAILWAY MENGGUNAKAN DYNAMIC PORT
     port = int(os.environ.get('PORT', 5000))
-    print(f"🌐 Server Webhook berjalan di port {port}...")
-    
-    # Host diubah menjadi 0.0.0.0 agar bisa diakses internet
     app.run(host='0.0.0.0', port=port)
